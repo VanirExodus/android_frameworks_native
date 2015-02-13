@@ -97,6 +97,13 @@ endif
 
 LOCAL_CFLAGS += -fvisibility=hidden -Werror=format
 LOCAL_CFLAGS += -std=c++11
+LOCAL_CFLAGS += \
+    -O2 \
+    $(DEBUG_SYMBOL_FLAGS) \
+    $(DEBUG_FRAME_POINTER_FLAGS) \
+    -fstrict-aliasing \
+    -Wstrict-aliasing \
+    -Werror=strict-aliasing
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
