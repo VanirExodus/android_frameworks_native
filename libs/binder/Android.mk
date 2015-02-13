@@ -45,6 +45,18 @@ endif
 
 LOCAL_PATH:= $(call my-dir)
 
+# Scale the vm binder size limit.
+ifeq ($(BONE_STOCK),true)
+  local_vm_binder_flags := -DSCALE_VM_BINDER_MB=1
+else
+  ifeq ($(TARGET_ARCH_LOWMEM),true)
+    local_vm_binder_flags := -DSCALE_VM_BINDER_MB=1
+  else
+    SCALE_VM_BINDER_MB ?= 2
+    local_vm_binder_flags := -DSCALE_VM_BINDER_MB=$(SCALE_VM_BINDER_MB)
+  endif
+endif
+
 include $(CLEAR_VARS)
 
 ifeq ($(BOARD_NEEDS_MEMORYHEAPION),true)
@@ -60,6 +72,8 @@ PLATFORM_DIR := $(TARGET_BOARD_PLATFORM)-$(TARGET_SLSI_VARIANT)
 endif
 LOCAL_C_INCLUDES += hardware/$(SLSI_DIR)/$(PLATFORM_DIR)/include
 endif
+
+LOCAL_CFLAGS += $(local_vm_binder_flags)
 
 LOCAL_MODULE := libbinder
 LOCAL_SHARED_LIBRARIES += liblog libcutils libutils
@@ -88,6 +102,8 @@ endif
 LOCAL_C_INCLUDES += hardware/$(SLSI_DIR)/$(PLATFORM_DIR)/include
 endif
 
+LOCAL_CFLAGS += $(local_vm_binder_flags)
+
 LOCAL_MODULE := libbinder
 LOCAL_STATIC_LIBRARIES += libutils
 LOCAL_SRC_FILES := $(sources)
@@ -103,4 +119,8 @@ LOCAL_CFLAGS += -DBINDER_IPC_32BIT=1
 endif
 endif
 LOCAL_CFLAGS += -Werror
+
+# unset local variables
+local_vm_binder_flags :=
+
 include $(BUILD_STATIC_LIBRARY)
