@@ -288,6 +288,7 @@ void DispSync::reset() {
     mModelUpdated = false;
     mNumResyncSamples = 0;
     mFirstResyncSample = 0;
+    mResyncReferenceTime = 0;
     mNumResyncSamplesSincePresent = 0;
     resetErrorLocked();
 }
@@ -329,8 +330,7 @@ bool DispSync::addResyncSample(nsecs_t timestamp) {
     size_t idx = (mFirstResyncSample + mNumResyncSamples) % MAX_RESYNC_SAMPLES;
     mResyncSamples[idx] = timestamp;
     if (mNumResyncSamples == 0) {
-        mPhase = 0;
-        mReferenceTime = timestamp;
+        mResyncReferenceTime = timestamp;
     }
 
     if (mNumResyncSamples < MAX_RESYNC_SAMPLES) {
@@ -409,7 +409,7 @@ void DispSync::updateModelLocked() {
         double scale = 2.0 * M_PI / double(mPeriod);
         for (size_t i = 0; i < mNumResyncSamples; i++) {
             size_t idx = (mFirstResyncSample + i) % MAX_RESYNC_SAMPLES;
-            nsecs_t sample = mResyncSamples[idx] - mReferenceTime;
+            nsecs_t sample = mResyncSamples[idx] - mResyncReferenceTime;
             double samplePhase = double(sample % mPeriod) * scale;
             sampleAvgX += cos(samplePhase);
             sampleAvgY += sin(samplePhase);
@@ -445,7 +445,7 @@ void DispSync::updateErrorLocked() {
     nsecs_t sqErrSum = 0;
 
     for (size_t i = 0; i < NUM_PRESENT_SAMPLES; i++) {
-        nsecs_t sample = mPresentTimes[i] - mReferenceTime;
+        nsecs_t sample = mPresentTimes[i] - mResyncReferenceTime;
         if (sample > mPhase) {
             nsecs_t sampleErr = (sample - mPhase) % period;
             if (sampleErr > period / 2) {
