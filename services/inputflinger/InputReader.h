@@ -1175,7 +1175,8 @@ private:
 
     bool isKeyboardOrGamepadKey(int32_t scanCode);
 
-    void processKey(nsecs_t when, bool down, int32_t scanCode, int32_t usageCode);
+    void processKey(nsecs_t when, bool down, int32_t keyCode, int32_t scanCode,
+            uint32_t policyFlags);
 
     ssize_t findKeyDown(int32_t scanCode);
 

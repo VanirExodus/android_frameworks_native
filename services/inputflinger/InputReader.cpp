@@ -2193,7 +2193,13 @@ void KeyboardInputMapper::process(const RawEvent* rawEvent) {
         mCurrentHidUsage = 0;
 
         if (isKeyboardOrGamepadKey(scanCode)) {
-            processKey(rawEvent->when, rawEvent->value != 0, scanCode, usageCode);
+            int32_t keyCode;
+            uint32_t flags;
+            if (getEventHub()->mapKey(getDeviceId(), scanCode, usageCode, &keyCode, &flags)) {
+                keyCode = AKEYCODE_UNKNOWN;
+                flags = 0;
+            }
+            processKey(rawEvent->when, rawEvent->value != 0, keyCode, scanCode, flags);
         }
         break;
     }
@@ -2218,18 +2224,8 @@ bool KeyboardInputMapper::isKeyboardOrGamepadKey(int32_t scanCode) {
         || (scanCode >= BTN_JOYSTICK && scanCode < BTN_DIGI);
 }
 
-void KeyboardInputMapper::processKey(nsecs_t when, bool down, int32_t scanCode,
-        int32_t usageCode) {
-    int32_t keyCode;
-    int32_t keyMetaState;
-    uint32_t policyFlags;
-
-    if (getEventHub()->mapKey(getDeviceId(), scanCode, usageCode, mMetaState,
-                              &keyCode, &keyMetaState, &policyFlags)) {
-        keyCode = AKEYCODE_UNKNOWN;
-        keyMetaState = mMetaState;
-        policyFlags = 0;
-    }
+void KeyboardInputMapper::processKey(nsecs_t when, bool down, int32_t keyCode,
+        int32_t scanCode, uint32_t policyFlags) {
 
     if (down) {
         // Rotate key codes according to orientation if needed.
@@ -2282,12 +2278,6 @@ void KeyboardInputMapper::processKey(nsecs_t when, bool down, int32_t scanCode,
     if (metaStateChanged) {
         mMetaState = newMetaState;
         updateLedState(false);
-
-        // If global meta state changed send it along with the key.
-        // If it has not changed then we'll use what keymap gave us,
-        // since key replacement logic might temporarily reset a few
-        // meta bits for given key.
-        keyMetaState = newMetaState;
     }
 
     nsecs_t downTime = mDownTime;
@@ -2315,7 +2305,7 @@ void KeyboardInputMapper::processKey(nsecs_t when, bool down, int32_t scanCode,
 
     NotifyKeyArgs args(when, getDeviceId(), mSource, policyFlags,
             down ? AKEY_EVENT_ACTION_DOWN : AKEY_EVENT_ACTION_UP,
-            AKEY_EVENT_FLAG_FROM_SYSTEM, keyCode, scanCode, keyMetaState, downTime);
+            AKEY_EVENT_FLAG_FROM_SYSTEM, keyCode, scanCode, newMetaState, downTime);
     getListener()->notifyKey(&args);
 }
 
@@ -3578,10 +3568,8 @@ void TouchInputMapper::configureVirtualKeys() {
 
         virtualKey.scanCode = virtualKeyDefinition.scanCode;
         int32_t keyCode;
-        int32_t dummyKeyMetaState;
         uint32_t flags;
-        if (getEventHub()->mapKey(getDeviceId(), virtualKey.scanCode, 0, 0,
-                                  &keyCode, &dummyKeyMetaState, &flags)) {
+        if (getEventHub()->mapKey(getDeviceId(), virtualKey.scanCode, 0, &keyCode, &flags)) {
             ALOGW(INDENT "VirtualKey %d: could not obtain key code, ignoring",
                     virtualKey.scanCode);
             mVirtualKeys.pop(); // drop the key

@@ -438,12 +438,10 @@ bool EventHub::markSupportedKeyCodes(int32_t deviceId, size_t numCodes,
     return false;
 }
 
-status_t EventHub::mapKey(int32_t deviceId,
-        int32_t scanCode, int32_t usageCode, int32_t metaState,
-        int32_t* outKeycode, int32_t* outMetaState, uint32_t* outFlags) const {
+status_t EventHub::mapKey(int32_t deviceId, int32_t scanCode, int32_t usageCode,
+        int32_t* outKeycode, uint32_t* outFlags) const {
     AutoMutex _l(mLock);
     Device* device = getDeviceLocked(deviceId);
-    status_t status = NAME_NOT_FOUND;
 
     if (device) {
         // Check the key character map first.
@@ -451,34 +449,22 @@ status_t EventHub::mapKey(int32_t deviceId,
         if (kcm != NULL) {
             if (!kcm->mapKey(scanCode, usageCode, outKeycode)) {
                 *outFlags = 0;
-                status = NO_ERROR;
+                return NO_ERROR;
             }
         }
 
         // Check the key layout next.
-        if (status != NO_ERROR && device->keyMap.haveKeyLayout()) {
+        if (device->keyMap.haveKeyLayout()) {
             if (!device->keyMap.keyLayoutMap->mapKey(
                     scanCode, usageCode, outKeycode, outFlags)) {
-                status = NO_ERROR;
-            }
-        }
-
-        if (status == NO_ERROR) {
-            if (kcm != NULL) {
-                kcm->tryRemapKey(*outKeycode, metaState, outKeycode, outMetaState);
-            } else {
-                *outMetaState = metaState;
+                return NO_ERROR;
             }
         }
     }
 
-    if (status != NO_ERROR) {
-        *outKeycode = 0;
-        *outFlags = 0;
-        *outMetaState = metaState;
-    }
-
-    return status;
+    *outKeycode = 0;
+    *outFlags = 0;
+    return NAME_NOT_FOUND;
 }
 
 status_t EventHub::mapAxis(int32_t deviceId, int32_t scanCode, AxisInfo* outAxisInfo) const {
