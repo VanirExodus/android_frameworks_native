@@ -208,13 +208,9 @@ static void release_object(const sp<ProcessState>& proc,
         case BINDER_TYPE_FD: {
             if (obj.cookie != 0) { // owned
                 if (outAshmemSize != NULL) {
-                    struct stat st;
-                    int ret = fstat(obj.handle, &st);
-                    if (!ret && S_ISCHR(st.st_mode) && (st.st_rdev == ashmem_rdev())) {
-                        int size = ashmem_get_size_region(obj.handle);
-                        if (size > 0) {
-                            *outAshmemSize -= size;
-                        }
+                    int size = ashmem_get_size_region(obj.handle);
+                    if (size > 0) {
+                        *outAshmemSize -= size;
                     }
                 }
             close(obj.handle);
