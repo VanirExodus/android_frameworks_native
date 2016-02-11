@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+
 namespace android {
 
 // ---------------------------------------------------------------------
@@ -185,7 +186,7 @@ void printHexData(int32_t indent, const void *buf, size_t length,
     if ((int32_t)length < 0) {
         if (singleLineBytesCutoff < 0) func(cookie, "\n");
         char buf[64];
-        sprintf(buf, "(bad length: %zu)", length);
+        snprintf(buf, sizeof(buf), "(bad length: %zu)", length);
         func(cookie, buf);
         return;
     }
@@ -211,7 +212,7 @@ void printHexData(int32_t indent, const void *buf, size_t length,
 
         char* c = buffer;
         if (!oneLine && !cStyle) {
-            sprintf(c, "0x%08x: ", (int)offset);
+            snprintf(c, sizeof(buffer), "0x%08x: ", (int)offset); //TODO: dave kessler ?
             c += 12;
         }
 
