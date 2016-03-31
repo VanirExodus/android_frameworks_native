@@ -295,7 +295,7 @@ DispSync::DispSync() :
         mRefreshSkipCount(0),
         mThread(new DispSyncThread()) {
 
-    mThread->run("DispSync", PRIORITY_URGENT_DISPLAY + PRIORITY_REALTIME);
+    mThread->run("DispSync", PRIORITY_URGENT_DISPLAY + PRIORITY_MORE_FAVORABLE);
     android_set_rt_ioprio(mThread->getTid(), 1);
 
     reset();
