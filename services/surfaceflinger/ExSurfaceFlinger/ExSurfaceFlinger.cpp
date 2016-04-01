@@ -33,7 +33,6 @@
 #ifdef QTI_BSP
 #include <hardware/display_defs.h>
 #endif
-#define ATRACE_TAG ATRACE_TAG_GRAPHICS
 
 namespace android {
 

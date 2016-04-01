@@ -17,8 +17,6 @@
  * limitations under the License.
  */
 
-#define ATRACE_TAG ATRACE_TAG_GRAPHICS
-
 //#define LOG_NDEBUG 0
 
 #include <stdlib.h>
@@ -28,7 +26,6 @@
 
 #include <utils/Errors.h>
 #include <utils/Log.h>
-#include <utils/Trace.h>
 #include <GLES/gl.h>
 #include <GLES2/gl2.h>
 
@@ -123,7 +120,6 @@ void LayerBlur::onDraw(const sp<const DisplayDevice>& hw, const Region& /*clip*/
         bool useIdentityTransform)
 {
     clock_t t1 = clock();
-    const ScopedTrace traceTotal(ATRACE_TAG, "Blur.onDraw");
 
     const Layer::State& s(getDrawingState());
 
@@ -222,7 +218,6 @@ void LayerBlur::onDraw(const sp<const DisplayDevice>& hw, const Region& /*clip*/
 
 
 bool LayerBlur::captureScreen(const sp<const DisplayDevice>& hw, FBO& fbo, Texture& texture, int width, int height) {
-    ATRACE_CALL();
     ensureFbo(fbo, width, height, texture.getTextureName());
     Transform::orientation_flags rotation = Transform::ROT_0;
     if(fbo.fbo == 0) {
@@ -259,7 +254,6 @@ bool LayerBlur::captureScreen(const sp<const DisplayDevice>& hw, FBO& fbo, Textu
 bool LayerBlur::drawMaskLayer(sp<Layer>& maskLayer, const sp<const DisplayDevice>& hw,
         FBO& fbo, int width, int height, int sampling, Texture& texture) {
     // Draw maskLayer into fbo
-    ATRACE_CALL();
 
     int maskWidth = width/sampling;
     int maskHeight = height/sampling;
@@ -305,7 +299,6 @@ void LayerBlur::doDrawFinal(const sp<const DisplayDevice>& hw,
         bool useIdentityTransform,
         Texture* maskTexture
         ) {
-    ATRACE_CALL();
 
     int hwWidth = hw->getWidth();
     int hwHeight = hw->getHeight();
