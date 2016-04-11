@@ -184,13 +184,15 @@ void printHexData(int32_t indent, const void *buf, size_t length,
     
     if ((int32_t)length < 0) {
         if (singleLineBytesCutoff < 0) func(cookie, "\n");
-        char buf[64];
-        sprintf(buf, "(bad length: %zu)", length);
+        int bufLength = 64;
+        char buf[bufLength];
+        snprintf(buf, bufLength, "(bad length: %zu)", length);
         func(cookie, buf);
         return;
     }
-    
-    char buffer[256];
+
+    int bufferLength = 256;
+    char buffer[bufferLength];
     static const size_t maxBytesPerLine = (sizeof(buffer)-1-11-4)/(3+1);
     
     if (bytesPerLine > maxBytesPerLine) bytesPerLine = maxBytesPerLine;
@@ -211,7 +213,7 @@ void printHexData(int32_t indent, const void *buf, size_t length,
 
         char* c = buffer;
         if (!oneLine && !cStyle) {
-            sprintf(c, "0x%08x: ", (int)offset);
+            snprintf(c, bufferLength, "0x%08x: ", (int)offset);
             c += 12;
         }
 
