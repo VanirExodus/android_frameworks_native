@@ -112,11 +112,15 @@ void GraphicBuffer::free_handle()
         GraphicBufferAllocator& allocator(GraphicBufferAllocator::get());
         allocator.free(handle);
     }
+<<<<<<< HEAD
 
 #ifndef EGL_NEEDS_HANDLE
     handle = NULL;
 #endif
 
+=======
+    handle = NULL;
+>>>>>>> c9cefec470fa3ba9020b2675b64eb8f717ac87a1
     mWrappedBuffer = 0;
 }
 

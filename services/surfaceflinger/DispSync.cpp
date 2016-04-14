@@ -57,15 +57,17 @@ public:
             mStop(false),
             mPeriod(0),
             mPhase(0),
+            mReferenceTime(0),
             mWakeupLatency(0) {
     }
 
     virtual ~DispSyncThread() {}
 
-    void updateModel(nsecs_t period, nsecs_t phase) {
+    void updateModel(nsecs_t period, nsecs_t phase, nsecs_t referenceTime) {
         Mutex::Autolock lock(mMutex);
         mPeriod = period;
         mPhase = phase;
+        mReferenceTime = referenceTime;
         mCond.signal();
     }
 
@@ -186,7 +188,7 @@ public:
         return BAD_VALUE;
     }
 
-    // This method is only here to handle the kIgnorePresentFences case.
+    // This method is only here to handle the mIgnorePresentFences case.
     bool hasAnyEventListeners() {
         Mutex::Autolock lock(mMutex);
         return !mEventListeners.empty();
@@ -247,7 +249,7 @@ private:
             ref = lastEventTime;
         }
 
-        nsecs_t phase = mPhase + listener.mPhase;
+        nsecs_t phase = mReferenceTime + mPhase + listener.mPhase;
         nsecs_t t = (((ref - phase) / mPeriod) + 1) * mPeriod + phase;
 
         if (t - listener.mLastEventTime < mPeriod / 2) {
@@ -267,6 +269,7 @@ private:
 
     nsecs_t mPeriod;
     nsecs_t mPhase;
+    nsecs_t mReferenceTime;
     nsecs_t mWakeupLatency;
 
     Vector<EventListener> mEventListeners;
@@ -290,7 +293,12 @@ private:
 
 DispSync::DispSync() :
         mRefreshSkipCount(0),
-        mThread(new DispSyncThread()) {
+        mThread(new DispSyncThread()),
+        mIgnorePresentFences(false) {
+
+#if defined(RUNNING_WITHOUT_SYNC_FRAMEWORK)
+    mIgnorePresentFences = true;
+#endif
 
     mThread->run("DispSync", PRIORITY_URGENT_DISPLAY + PRIORITY_MORE_FAVORABLE);
     android_set_rt_ioprio(mThread->getTid(), 1);
@@ -304,7 +312,7 @@ DispSync::DispSync() :
         // Even if we're just ignoring the fences, the zero-phase tracing is
         // not needed because any time there is an event registered we will
         // turn on the HW vsync events.
-        if (!kIgnorePresentFences) {
+        if (!mIgnorePresentFences) {
             addEventListener(0, new ZeroPhaseTracer());
         }
     }
@@ -315,6 +323,9 @@ DispSync::~DispSync() {}
 void DispSync::reset() {
     Mutex::Autolock lock(mMutex);
 
+    mPhase = 0;
+    mReferenceTime = 0;
+    mModelUpdated = false;
     mNumResyncSamples = 0;
     mFirstResyncSample = 0;
     mNumResyncSamplesSincePresent = 0;
@@ -342,12 +353,13 @@ bool DispSync::addPresentFence(const sp<Fence>& fence) {
 
     updateErrorLocked();
 
-    return mPeriod == 0 || mError > kErrorThreshold;
+    return !mModelUpdated || mError > kErrorThreshold;
 }
 
 void DispSync::beginResync() {
     Mutex::Autolock lock(mMutex);
 
+    mModelUpdated = false;
     mNumResyncSamples = 0;
 }
 
@@ -356,6 +368,10 @@ bool DispSync::addResyncSample(nsecs_t timestamp) {
 
     size_t idx = (mFirstResyncSample + mNumResyncSamples) % MAX_RESYNC_SAMPLES;
     mResyncSamples[idx] = timestamp;
+    if (mNumResyncSamples == 0) {
+        mPhase = 0;
+        mReferenceTime = timestamp;
+    }
 
     if (mNumResyncSamples < MAX_RESYNC_SAMPLES) {
         mNumResyncSamples++;
@@ -369,7 +385,7 @@ bool DispSync::addResyncSample(nsecs_t timestamp) {
         resetErrorLocked();
     }
 
-    if (kIgnorePresentFences) {
+    if (mIgnorePresentFences) {
         // If we don't have the sync framework we will never have
         // addPresentFence called.  This means we have no way to know whether
         // or not we're synchronized with the HW vsyncs, so we just request
@@ -378,7 +394,7 @@ bool DispSync::addResyncSample(nsecs_t timestamp) {
         return mThread->hasAnyEventListeners();
     }
 
-    return mPeriod == 0 || mError > kErrorThreshold;
+    return !mModelUpdated || mError > kErrorThreshold;
 }
 
 void DispSync::endResync() {
@@ -407,7 +423,8 @@ void DispSync::setPeriod(nsecs_t period) {
     Mutex::Autolock lock(mMutex);
     mPeriod = period;
     mPhase = 0;
-    mThread->updateModel(mPeriod, mPhase);
+    mReferenceTime = 0;
+    mThread->updateModel(mPeriod, mPhase, mReferenceTime);
 }
 
 nsecs_t DispSync::getPeriod() {
@@ -432,7 +449,7 @@ void DispSync::updateModelLocked() {
         double scale = 2.0 * M_PI / double(mPeriod);
         for (size_t i = 0; i < mNumResyncSamples; i++) {
             size_t idx = (mFirstResyncSample + i) % MAX_RESYNC_SAMPLES;
-            nsecs_t sample = mResyncSamples[idx];
+            nsecs_t sample = mResyncSamples[idx] - mReferenceTime;
             double samplePhase = double(sample % mPeriod) * scale;
             sampleAvgX += cos(samplePhase);
             sampleAvgY += sin(samplePhase);
@@ -455,12 +472,13 @@ void DispSync::updateModelLocked() {
         // Artificially inflate the period if requested.
         mPeriod += mPeriod * mRefreshSkipCount;
 
-        mThread->updateModel(mPeriod, mPhase);
+        mThread->updateModel(mPeriod, mPhase, mReferenceTime);
+        mModelUpdated = true;
     }
 }
 
 void DispSync::updateErrorLocked() {
-    if (mPeriod == 0) {
+    if (!mModelUpdated) {
         return;
     }
 
@@ -472,7 +490,7 @@ void DispSync::updateErrorLocked() {
     nsecs_t sqErrSum = 0;
 
     for (size_t i = 0; i < NUM_PRESENT_SAMPLES; i++) {
-        nsecs_t sample = mPresentTimes[i];
+        nsecs_t sample = mPresentTimes[i] - mReferenceTime;
         if (sample > mPhase) {
             nsecs_t sampleErr = (sample - mPhase) % period;
             if (sampleErr > period / 2) {
@@ -506,13 +524,14 @@ void DispSync::resetErrorLocked() {
 nsecs_t DispSync::computeNextRefresh(int periodOffset) const {
     Mutex::Autolock lock(mMutex);
     nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
-    return (((now - mPhase) / mPeriod) + periodOffset + 1) * mPeriod + mPhase;
+    nsecs_t phase = mReferenceTime + mPhase;
+    return (((now - phase) / mPeriod) + periodOffset + 1) * mPeriod + phase;
 }
 
 void DispSync::dump(String8& result) const {
     Mutex::Autolock lock(mMutex);
     result.appendFormat("present fences are %s\n",
-            kIgnorePresentFences ? "ignored" : "used");
+            mIgnorePresentFences ? "ignored" : "used");
     result.appendFormat("mPeriod: %" PRId64 " ns (%.3f fps; skipCount=%d)\n",
             mPeriod, 1000000000.0 / mPeriod, mRefreshSkipCount);
     result.appendFormat("mPhase: %" PRId64 " ns\n", mPhase);
@@ -562,6 +581,16 @@ void DispSync::dump(String8& result) const {
     }
 
     result.appendFormat("current monotonic time: %" PRId64 "\n", now);
+}
+
+void DispSync::setIgnorePresentFences(bool enable) {
+#ifndef RUNNING_WITHOUT_SYNC_FRAMEWORK
+    if (mIgnorePresentFences != enable) {
+        reset();
+        mIgnorePresentFences = enable;
+        ALOGD("%s(%d)", __FUNCTION__, enable);
+    }
+#endif
 }
 
 } // namespace android
