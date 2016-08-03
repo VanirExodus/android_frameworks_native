@@ -397,6 +397,7 @@ void LayerBlur::ensureFbo(FBO& fbo, int width, int height, int textureName) {
 // ---------------------------------------------------------------------------
 
 void* LayerBlur::BlurImpl::sLibHandle = NULL;
+bool LayerBlur::BlurImpl::sUnsupported = false;
 
 LayerBlur::BlurImpl::initBlurTokenFn LayerBlur::BlurImpl::initBlurToken = NULL;
 LayerBlur::BlurImpl::releaseBlurTokenFn LayerBlur::BlurImpl::releaseBlurToken = NULL;
@@ -414,8 +415,13 @@ status_t LayerBlur::BlurImpl::initBlurImpl() {
     if (sLibHandle != NULL) {
         return OK;
     }
+    if (sUnsupported) {
+        return NO_INIT;
+    }
+
     sLibHandle = dlopen("libuiblur.so", RTLD_NOW);
     if (sLibHandle == NULL) {
+        sUnsupported = true;
         return NO_INIT;
     }
 
@@ -437,13 +443,14 @@ status_t LayerBlur::BlurImpl::initBlurImpl() {
     if (!initBlurToken || !releaseBlurToken || !doBlur) {
         ALOGE("dlsym failed for blur impl!: %s", dlerror());
         closeBlurImpl();
+        sUnsupported = true;
         return NO_INIT;
     }
 
     return OK;
 }
 
-LayerBlur::BlurImpl::BlurImpl() {
+LayerBlur::BlurImpl::BlurImpl() : mToken(NULL) {
     Mutex::Autolock _l(sLock);
     if (initBlurImpl() == OK) {
         mToken = initBlurToken();
