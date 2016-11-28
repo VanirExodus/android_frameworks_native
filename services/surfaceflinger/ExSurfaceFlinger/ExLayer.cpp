@@ -37,9 +37,7 @@
 #ifdef QTI_BSP
 #include <gralloc_priv.h>
 #include <qdMetaData.h>
-#ifdef USE_COLOR_METADATA
 #include <color_metadata.h>
-#endif
 #include <hardware/display_defs.h>
 #endif
 
@@ -168,7 +166,7 @@ bool ExLayer::isYuvLayer() const {
 bool ExLayer::isHDRLayer() const {
     const sp<GraphicBuffer>& activeBuffer(mActiveBuffer);
     if (activeBuffer != 0) {
-#ifdef USE_COLOR_METADATA
+#ifdef QTI_BSP
         ANativeWindowBuffer* buffer = activeBuffer->getNativeBuffer();
         if(buffer) {
             private_handle_t* hnd = static_cast<private_handle_t*>
