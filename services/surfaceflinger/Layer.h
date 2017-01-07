@@ -349,7 +349,6 @@ public:
     /* ------------------------------------------------------------------------
      * Extensions
      */
-#ifndef USE_HWC2
     virtual bool isExtOnly() const { return false; }
     virtual bool isIntOnly() const { return false; }
     virtual bool isSecureDisplay() const { return false; }
