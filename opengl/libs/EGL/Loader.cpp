@@ -15,6 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
+#define ATRACE_TAG ATRACE_TAG_GRAPHICS
 
 #include <array>
 #include <ctype.h>
@@ -29,6 +30,7 @@
 #include <android/dlext.h>
 #include <cutils/log.h>
 #include <cutils/properties.h>
+#include <utils/Trace.h>
 
 #include <EGL/egl.h>
 
@@ -123,6 +125,11 @@ static char const * getProcessCmdline() {
     return NULL;
 }
 
+static void* do_dlopen(const char* path, int mode) {
+    ATRACE_CALL();
+    return dlopen(path, mode);
+}
+
 // ----------------------------------------------------------------------------
 
 Loader::driver_t::driver_t(void* gles)
@@ -186,7 +193,7 @@ Loader::~Loader() {
 }
 
 static void* load_wrapper(const char* path) {
-    void* so = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+    void* so = do_dlopen(path, RTLD_NOW | RTLD_LOCAL);
     ALOGE_IF(!so, "dlopen(\"%s\") failed: %s", path, dlerror());
     return so;
 }
@@ -241,6 +248,8 @@ static void setEmulatorGlesValue(void) {
 
 void* Loader::open(egl_connection_t* cnx)
 {
+    ATRACE_CALL();
+
     void* dso;
     driver_t* hnd = 0;
 
@@ -286,6 +295,8 @@ void Loader::init_api(void* dso,
         __eglMustCastToProperFunctionPointerType* curr,
         getProcAddressType getProcAddress)
 {
+    ATRACE_CALL();
+
     const ssize_t SIZE = 256;
     char scrap[SIZE];
     while (*api) {
@@ -338,6 +349,7 @@ void Loader::init_api(void* dso,
 }
 
 static void* load_system_driver(const char* kind) {
+    ATRACE_CALL();
     class MatchFile {
     public:
         static String8 find(const char* kind) {
@@ -453,7 +465,7 @@ static void* load_system_driver(const char* kind) {
     }
     const char* const driver_absolute_path = absolutePath.string();
 
-    void* dso = dlopen(driver_absolute_path, RTLD_NOW | RTLD_LOCAL);
+    void* dso = do_dlopen(driver_absolute_path, RTLD_NOW | RTLD_LOCAL);
     if (dso == 0) {
         const char* err = dlerror();
         ALOGE("load_driver(%s): %s", driver_absolute_path, err?err:"unknown");
@@ -465,12 +477,18 @@ static void* load_system_driver(const char* kind) {
     return dso;
 }
 
+static void* do_android_dlopen_ext(const char* path, int mode, const android_dlextinfo* info) {
+    ATRACE_CALL();
+    return android_dlopen_ext(path, mode, info);
+}
+
 static const std::array<const char*, 2> HAL_SUBNAME_KEY_PROPERTIES = {{
     "ro.hardware.egl",
     "ro.board.platform",
 }};
 
 static void* load_updated_driver(const char* kind, android_namespace_t* ns) {
+    ATRACE_CALL();
     const android_dlextinfo dlextinfo = {
         .flags = ANDROID_DLEXT_USE_NAMESPACE,
         .library_namespace = ns,
@@ -481,7 +499,7 @@ static void* load_updated_driver(const char* kind, android_namespace_t* ns) {
         if (property_get(key, prop, nullptr) > 0) {
             String8 name;
             name.appendFormat("lib%s_%s.so", kind, prop);
-            so = android_dlopen_ext(name.string(), RTLD_LOCAL | RTLD_NOW,
+            so = do_android_dlopen_ext(name.string(), RTLD_LOCAL | RTLD_NOW,
                     &dlextinfo);
             if (so)
                 return so;
@@ -493,6 +511,8 @@ static void* load_updated_driver(const char* kind, android_namespace_t* ns) {
 void *Loader::load_driver(const char* kind,
         egl_connection_t* cnx, uint32_t mask)
 {
+    ATRACE_CALL();
+
     void* dso = nullptr;
     if (mGetDriverNamespace) {
         android_namespace_t* ns = mGetDriverNamespace();
