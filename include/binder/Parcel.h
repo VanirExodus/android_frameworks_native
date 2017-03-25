@@ -476,7 +476,13 @@ private:
             return val.flatten(buffer, size, fds, count);
         }
         virtual status_t unflatten(void const* buffer, size_t size, int const* fds, size_t count) {
-            return const_cast<Flattenable<T>&>(val).unflatten(buffer, size, fds, count);
+            status_t err = const_cast<Flattenable<T>&>(val).unflatten(buffer, size, fds, count);
+            if (err != NO_ERROR) {
+                for (size_t i = 0; i < count; i++) {
+                    close(fds[i]);
+                }
+            }
+            return err;
         }
     };
     status_t write(const FlattenableHelperInterface& val);
@@ -589,7 +595,15 @@ status_t Parcel::unsafeReadTypedVector(
         return UNEXPECTED_NULL;
     }
 
+    if (val->max_size() < size) {
+        return NO_MEMORY;
+    }
+
     val->resize(size);
+
+    if (val->size() < size) {
+        return NO_MEMORY;
+    }
 
     for (auto& v: *val) {
         status = (this->*read_func)(&v);
