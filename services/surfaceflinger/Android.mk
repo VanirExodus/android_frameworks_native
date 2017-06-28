@@ -37,7 +37,11 @@ LOCAL_SRC_FILES := \
     RenderEngine/GLES10RenderEngine.cpp \
     RenderEngine/GLES11RenderEngine.cpp \
     RenderEngine/GLES20RenderEngine.cpp \
-    DisplayUtils.cpp
+    DisplayUtils.cpp \
+    ExSurfaceFlinger/ExLayer.cpp \
+    ExSurfaceFlinger/ExSurfaceFlinger.cpp \
+    ExSurfaceFlinger/ExVirtualDisplaySurface.cpp \
+    ExSurfaceFlinger/ExHWComposer.cpp
 
 LOCAL_C_INCLUDES := \
 	frameworks/native/vulkan/include \
@@ -141,16 +145,6 @@ else
     LOCAL_CFLAGS += -DMAX_VIRTUAL_DISPLAY_DIMENSION=0
 endif
 
-ifeq ($(TARGET_SUPPORTS_S3D),)
-    ifeq ($(call is-board-platform-in-list,msm8996),true)
-        TARGET_SUPPORTS_S3D := true
-    endif
-endif
-
-ifeq ($(TARGET_SUPPORTS_S3D),true)
-    LOCAL_CFLAGS += -DQTI_S3D
-endif
-
 LOCAL_CFLAGS += -fvisibility=hidden -Werror=format
 LOCAL_CFLAGS += -std=c++14
 
@@ -180,28 +174,15 @@ ifeq ($(TARGET_USES_QCOM_BSP), true)
     LOCAL_SHARED_LIBRARIES += libqdutils
     LOCAL_SHARED_LIBRARIES += libqdMetaData
     LOCAL_CFLAGS += -DQTI_BSP
-    ifneq ($(TARGET_USES_HWC2),true)
-    LOCAL_SRC_FILES += \
-      ExSurfaceFlinger/ExLayer.cpp \
-      ExSurfaceFlinger/ExSurfaceFlinger.cpp \
-      ExSurfaceFlinger/ExVirtualDisplaySurface.cpp \
-      ExSurfaceFlinger/ExHWComposer.cpp
-    endif
-    ifeq ($(TARGET_SUPPORTS_COLOR_METADATA), true)
-      ifeq ($(call is-board-platform-in-list, msm8996), true)
-        LOCAL_CFLAGS += -DUSE_COLOR_METADATA
-      endif
-    endif
-  ifeq ($(TARGET_SUPPORTS_COLOR_METADATA),)
+  ifeq ($(TARGET_USES_COLOR_METADATA),)
     ifeq ($(call is-board-platform-in-list, msm8996), true)
-      TARGET_SUPPORTS_COLOR_METADATA := true
+      TARGET_USES_COLOR_METADATA := true
     endif
   endif
 
-  ifeq ($(TARGET_SUPPORTS_COLOR_METADATA), true)
-      LOCAL_CFLAGS += -DUSE_COLOR_METADATA
+  ifeq ($(TARGET_USES_COLOR_METADATA), true)
+    LOCAL_CFLAGS += -DUSE_COLOR_METADATA
   endif
-
 endif
 
 LOCAL_MODULE := libsurfaceflinger
